@@ -72,6 +72,7 @@ pub fn main() -> std::io::Result<()> {
     opts.optflag("d", "dry-run", "dry run, produce no output");
     opts.optflag("e", "events", "print event sequence instead of rendering");
     opts.optflag("T", "enable-tables", "enable GitHub-style tables");
+    opts.optflag("m", "enable-math", "enable LaTeX-style math");
     opts.optflag("F", "enable-footnotes", "enable GitHub-style footnotes");
     opts.optflag("", "enable-old-footnotes", "enable Hoedown-style footnotes");
     opts.optflag(
@@ -92,6 +93,7 @@ pub fn main() -> std::io::Result<()> {
         "reject-broken-links",
         "fail if input file has broken links",
     );
+    opts.optflag("G", "enable-gfm", "enable misc GFM features");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -107,6 +109,9 @@ pub fn main() -> std::io::Result<()> {
     let mut opts = Options::empty();
     if matches.opt_present("enable-tables") {
         opts.insert(Options::ENABLE_TABLES);
+    }
+    if matches.opt_present("enable-math") {
+        opts.insert(Options::ENABLE_MATH);
     }
     if matches.opt_present("enable-footnotes") {
         opts.insert(Options::ENABLE_FOOTNOTES);
@@ -129,6 +134,9 @@ pub fn main() -> std::io::Result<()> {
     if matches.opt_present("enable-metadata-blocks") {
         opts.insert(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS);
         opts.insert(Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS);
+    }
+    if matches.opt_present("enable-gfm") {
+        opts.insert(Options::ENABLE_GFM);
     }
 
     let mut input = String::new();
@@ -183,5 +191,5 @@ pub fn pulldown_cmark(input: &str, opts: Options, broken_links: &mut Vec<BrokenL
     );
     let stdio = io::stdout();
     let buffer = std::io::BufWriter::with_capacity(1024 * 1024, stdio.lock());
-    let _ = html::write_html(buffer, &mut p);
+    let _ = html::write_html_io(buffer, &mut p);
 }
