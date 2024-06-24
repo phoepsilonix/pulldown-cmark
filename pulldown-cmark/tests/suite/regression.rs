@@ -3071,3 +3071,43 @@ _**
 
     test_markdown_html(original, expected, false, false, false);
 }
+
+#[test]
+fn regression_test_195() {
+    let original = r##"> [!Note]
+> - Foo
+"##;
+    let expected = r##"<blockquote class="markdown-alert-note">
+<ul>
+<li>Foo</li>
+</ul>
+</blockquote>
+"##;
+
+    test_markdown_html(original, expected, false, false, false);
+}
+
+#[test]
+fn regression_test_196() {
+    let original = r##" ---
+--
+---
+"##;
+    let expected = r##"<hr />
+<h2>--</h2>
+"##;
+
+    test_markdown_html(original, expected, false, true, false);
+}
+
+#[test]
+fn regression_test_197() {
+    let original = r##"[30](https://rust.org/something%3A((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))
+[40](https://rust.org/something%3A((((((((((((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))))))))))))
+"##;
+    let expected = r##"<p><a href="https://rust.org/something%3A((((((((((((((((((((((((((((((()))))))))))))))))))))))))))))))">30</a>
+[40](https://rust.org/something%3A((((((((((((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))))))))))))</p>
+"##;
+
+    test_markdown_html(original, expected, false, true, false);
+}
