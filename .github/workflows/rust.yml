@@ -1,0 +1,56 @@
+name: Rust
+
+on:
+  - push
+  - pull_request
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  RUST_BACKTRACE: 1
+
+jobs:
+  pulldown-cmark:
+    strategy:
+      matrix:
+        rust-version: ['1.71.1', 'stable', 'nightly']
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pulldown-cmark
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust
+      run: rustup default ${{ matrix.rust-version }}
+    - name: Cargo build
+      run: cargo build --verbose
+    - name: Cargo test
+      run: cargo test --verbose
+    - name: Cargo test with simd feature enabled
+      run: cargo test --features=simd,gen-tests
+    - name: Cargo test with serde feature enabled
+      run: cargo test --features=serde
+    - name: Cargo test without default features
+      run: cargo test --no-default-features
+  pulldown-cmark-escape:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust
+      run: rustup default stable
+    - name: Cargo test
+      working-directory: pulldown-cmark-escape
+      run: cargo test --verbose --all
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust
+      working-directory: pulldown-cmark
+      run: rustup default stable
+    - name: Test for superlinear time regressions
+      working-directory: dos-fuzzer
+      run: cargo run --release -- --regressions
+    - name: Check benchmarks are not broken
+      working-directory: bench
+      run: cargo check --benches
