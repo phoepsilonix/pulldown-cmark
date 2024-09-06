@@ -300,6 +300,27 @@ where
                     self.write("\n<li>")
                 }
             }
+            Tag::DefinitionList => {
+                if self.end_newline {
+                    self.write("<dl>\n")
+                } else {
+                    self.write("\n<dl>\n")
+                }
+            }
+            Tag::DefinitionListTitle => {
+                if self.end_newline {
+                    self.write("<dt>")
+                } else {
+                    self.write("\n<dt>")
+                }
+            }
+            Tag::DefinitionListDefinition => {
+                if self.end_newline {
+                    self.write("<dd>")
+                } else {
+                    self.write("\n<dd>")
+                }
+            }
             Tag::Emphasis => self.write("<em>"),
             Tag::Strong => self.write("<strong>"),
             Tag::Strikethrough => self.write("<del>"),
@@ -399,7 +420,7 @@ where
                 }
                 self.table_cell_index += 1;
             }
-            TagEnd::BlockQuote => {
+            TagEnd::BlockQuote(_) => {
                 self.write("</blockquote>\n")?;
             }
             TagEnd::CodeBlock => {
@@ -413,6 +434,15 @@ where
             }
             TagEnd::Item => {
                 self.write("</li>\n")?;
+            }
+            TagEnd::DefinitionList => {
+                self.write("</dl>\n")?;
+            }
+            TagEnd::DefinitionListTitle => {
+                self.write("</dt>\n")?;
+            }
+            TagEnd::DefinitionListDefinition => {
+                self.write("</dd>\n")?;
             }
             TagEnd::Emphasis => {
                 self.write("</em>")?;
