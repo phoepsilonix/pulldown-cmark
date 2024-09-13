@@ -75,7 +75,7 @@ impl<'a, 'b> FirstPass<'a, 'b> {
         while ix < self.text.len() {
             ix = self.parse_block(ix);
         }
-        for _ in 0..self.tree.spine_len() {
+        while self.tree.spine_len() > 0 {
             self.pop(ix);
         }
         (self.tree, self.allocs)
@@ -122,33 +122,31 @@ impl<'a, 'b> FirstPass<'a, 'b> {
 
         // Process new containers
         loop {
+            let save = line_start.clone();
+            let outer_indent = line_start.scan_space_upto(4);
+            if outer_indent >= 4 {
+                line_start = save;
+                break;
+            }
             if self.options.has_gfm_footnotes()
                 || self.options.contains(Options::ENABLE_OLD_FOOTNOTES)
             {
                 // Footnote definitions of the form
                 // [^bar]:
                 //     * anything really
-                let save = line_start.clone();
-                let indent = line_start.scan_space_upto(4);
-                if indent < 4 {
-                    let container_start = start_ix + line_start.bytes_scanned();
-                    if let Some(bytecount) = self.parse_footnote(container_start) {
-                        start_ix = container_start + bytecount;
-                        line_start = LineStart::new(&bytes[start_ix..]);
-                        continue;
-                    } else {
-                        line_start = save;
-                    }
-                } else {
-                    line_start = save;
+                let container_start = start_ix + line_start.bytes_scanned();
+                if let Some(bytecount) = self.parse_footnote(container_start) {
+                    start_ix = container_start + bytecount;
+                    line_start = LineStart::new(&bytes[start_ix..]);
+                    continue;
                 }
             }
             let container_start = start_ix + line_start.bytes_scanned();
-            if let Some((ch, index, indent)) = line_start.scan_list_marker() {
+            if let Some((ch, index, indent)) = line_start.scan_list_marker_with_indent(outer_indent) {
                 let after_marker_index = start_ix + line_start.bytes_scanned();
-                self.continue_list(container_start, ch, index);
+                self.continue_list(container_start - outer_indent, ch, index);
                 self.tree.append(Item {
-                    start: container_start,
+                    start: container_start - outer_indent,
                     end: after_marker_index, // will get updated later if item not empty
                     body: ItemBody::ListItem(indent),
                 });
@@ -196,7 +194,7 @@ impl<'a, 'b> FirstPass<'a, 'b> {
                 })
                 .and_then(|item| {
                     Some((
-                        line_start.scan_definition_list_definition_marker()?,
+                        line_start.scan_definition_list_definition_marker_with_indent(outer_indent)?,
                         item.0,
                         item.1,
                     ))
@@ -224,7 +222,7 @@ impl<'a, 'b> FirstPass<'a, 'b> {
                 }
                 let after_marker_index = start_ix + line_start.bytes_scanned();
                 self.tree.append(Item {
-                    start: container_start,
+                    start: container_start - outer_indent,
                     end: after_marker_index, // will get updated later if item not empty
                     body: ItemBody::DefinitionListDefinition(indent),
                 });
@@ -282,6 +280,7 @@ impl<'a, 'b> FirstPass<'a, 'b> {
                     }
                 }
             } else {
+                line_start = save;
                 break;
             }
         }
@@ -585,9 +584,14 @@ impl<'a, 'b> FirstPass<'a, 'b> {
         let body = if let Some(ItemBody::DefinitionList(_)) =
             self.tree.peek_up().map(|idx| self.tree[idx].item.body)
         {
-            // blank lines between the previous definition and this one don't count
-            self.last_line_blank = false;
-            ItemBody::MaybeDefinitionListTitle
+            if self.tree.cur().map_or(true, |idx| matches!(&self.tree[idx].item.body, ItemBody::DefinitionListDefinition(..))) {
+                // blank lines between the previous definition and this one don't count
+                self.last_line_blank = false;
+                ItemBody::MaybeDefinitionListTitle
+            } else {
+                self.finish_list(start_ix);
+                ItemBody::Paragraph
+            }
         } else {
             self.finish_list(start_ix);
             ItemBody::Paragraph
@@ -2283,7 +2287,7 @@ fn delim_run_can_open(
     ix: usize,
     mode: TableParseMode,
 ) -> bool {
-    let next_char = if let Some(c) = suffix.chars().nth(run_len) {
+    let next_char = if let Some(c) = suffix[run_len..].chars().next() {
         c
     } else {
         return false;
@@ -2295,28 +2299,28 @@ fn delim_run_can_open(
         return true;
     }
     if mode == TableParseMode::Active {
-        if s[..ix].ends_with('|') && !s[..ix].ends_with(r"\|") {
+        if s.as_bytes()[..ix].ends_with(b"|") && !s.as_bytes()[..ix].ends_with(br"\|") {
             return true;
         }
         if next_char == '|' {
             return false;
         }
     }
-    let delim = suffix.chars().next().unwrap();
+    let delim = suffix.bytes().next().unwrap();
     // `*` and `~~` can be intraword, `_` and `~` cannot
-    if delim == '*' && !is_punctuation(next_char) {
+    if delim == b'*' && !is_punctuation(next_char) {
         return true;
     }
-    if delim == '~' && run_len > 1 {
+    if delim == b'~' && run_len > 1 {
         return true;
     }
     let prev_char = s[..ix].chars().last().unwrap();
-    if delim == '~' && prev_char == '~' && !is_punctuation(next_char) {
+    if delim == b'~' && prev_char == '~' && !is_punctuation(next_char) {
         return true;
     }
 
     prev_char.is_whitespace()
-        || is_punctuation(prev_char) && (delim != '\'' || ![']', ')'].contains(&prev_char))
+        || is_punctuation(prev_char) && (delim != b'\'' || ![']', ')'].contains(&prev_char))
 }
 
 /// Determines whether the delimiter run starting at given index is
@@ -2336,25 +2340,25 @@ fn delim_run_can_close(
     if prev_char.is_whitespace() {
         return false;
     }
-    let next_char = if let Some(c) = suffix.chars().nth(run_len) {
+    let next_char = if let Some(c) = suffix[run_len..].chars().next() {
         c
     } else {
         return true;
     };
     if mode == TableParseMode::Active {
-        if s[..ix].ends_with('|') && !s[..ix].ends_with(r"\|") {
+        if s.as_bytes()[..ix].ends_with(b"|") && !s.as_bytes()[..ix].ends_with(br"\|") {
             return false;
         }
         if next_char == '|' {
             return true;
         }
     }
-    let delim = suffix.chars().next().unwrap();
+    let delim = suffix.bytes().next().unwrap();
     // `*` and `~~` can be intraword, `_` and `~` cannot
-    if (delim == '*' || (delim == '~' && run_len > 1)) && !is_punctuation(prev_char) {
+    if (delim == b'*' || (delim == b'~' && run_len > 1)) && !is_punctuation(prev_char) {
         return true;
     }
-    if delim == '~' && prev_char == '~' {
+    if delim == b'~' && prev_char == '~' {
         return true;
     }
 
