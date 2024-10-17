@@ -2,15 +2,15 @@ TARGET=$(shell cat target.txt)
 
 .PHONY: lint
 lint:
-	@cargo +nightly clippy
+	@cross clippy
 
 .PHONY: fix
 fix:
-	@cargo +nightly clippy --fix
+	@cross clippy --fix
 
 .PHONY: test
 test:
-	@cargo +nightly test
+	@cross test
 
 .PHONY: shellspec
 shellspec:
@@ -18,20 +18,20 @@ shellspec:
 
 .PHONY: install
 install:
-	@cargo +nightly install --path .
+	@cross install --path .
 
 .PHONY: check
 check:
-	@cargo +nightly check
+	@cross check
 
 .PHONY: target-add
 target-add:
-	@rustup override set nightly
+	@rustup override set stable
 	@rustup target add $(TARGET)
 
 .PHONY: target-build
 target-build: target-add
-	@for target in $(TARGET); do echo $$target; cargo +nightly zigbuild --release --target $$target || cargo +stable zigbuild --release --target $$target; done
+	@for target in $(TARGET); do echo $$target; cross build --release --target $$target; done
 
 .PHONY: target-archive
 target-archive: target-build
