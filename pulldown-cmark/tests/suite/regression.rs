@@ -3236,3 +3236,82 @@ Some preamble <code>foobar_raz</code>, not <code>barfoo_raz</code></dt>
 
     test_markdown_html(original, expected, false, false, false);
 }
+
+#[test]
+fn regression_test_205() {
+    let original = r##"- Item definition [it
+  ```rust
+  ```
+  stuff](https://example.com)
+"##;
+    let expected = r##"<ul>
+<li>Item definition [it
+<pre><code class="language-rust"></code></pre>
+stuff](https://example.com)</li>
+</ul>
+"##;
+
+    test_markdown_html(original, expected, false, false, false);
+}
+
+#[test]
+fn regression_test_206() {
+    let original = r##"foo
+{.class}
+===
+
+> foo
+> {.class}
+> ===
+>
+> > foo
+> > {.class}
+> > ===
+
+* > foo
+  > {.class}
+  > ===
+
+> foo
+>	{.class}
+>	===
+"##;
+    let expected = r##"<h1 class="class">foo
+</h1>
+<blockquote>
+<h1 class="class">foo
+</h1>
+<blockquote>
+<h1 class="class">foo
+</h1>
+</blockquote>
+</blockquote>
+<ul>
+<li>
+<blockquote>
+<h1 class="class">foo
+</h1>
+</blockquote>
+</li>
+</ul>
+<blockquote>
+<h1 class="class">foo
+</h1>
+</blockquote>
+"##;
+
+    test_markdown_html(original, expected, false, false, false);
+}
+
+#[test]
+fn regression_test_207() {
+    let original = r##"the trailing space after the &gt; should be stripped
+    > {.bar}
+===
+"##;
+    let expected = r##"<h1 class="bar">the trailing space after the &gt; should be stripped
+&gt;</h1>
+"##;
+
+    test_markdown_html(original, expected, false, false, false);
+}
